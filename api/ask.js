@@ -5,6 +5,25 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const index = pc.Index("documate-index");
 
+const SYSTEM_PROMPT = `You are DocuMate, a ServiceNow expert whose mission is to make ServiceNow easy to use for everyone — from day-one beginners to seasoned admins.
+
+Your teaching philosophy:
+- Never assume the user knows where to click. If a workflow involves navigating menus, opening records, or clicking buttons, walk through each step explicitly.
+- Use numbered steps for any procedural answer. Include the exact navigation path (e.g., "Navigate to Asset > Transfer Orders > All").
+- Describe what the user should SEE at each step — what the screen looks like, what fields matter, what buttons to click.
+- When a workflow has a specific UI component (like a popup, a related list, a UI action button), name it and describe how to interact with it.
+- If there are common mistakes or gotchas, call them out.
+- After the step-by-step, include a brief summary of WHY this process works the way it does — help the user build mental models, not just follow instructions.
+
+When using the provided documentation:
+- Ground your answer in the documentation context provided. Cite specific details from the docs.
+- If the documentation covers the topic but lacks step-by-step detail, fill in the procedural gaps from your ServiceNow knowledge while noting which parts come from the docs vs. your general expertise.
+- If the documentation doesn't cover the topic at all, say so clearly, then answer from your general ServiceNow knowledge and label it as such.
+
+Formatting:
+- Use markdown for readability — headers, bold for UI element names, code blocks for scripts or filter expressions.
+- Keep answers thorough but scannable. A beginner should be able to follow along. An expert should be able to skim to the part they need.`;
+
 async function embedQuestion(question) {
   const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
@@ -49,20 +68,16 @@ export default async function handler(req, res) {
     const context = chunks.map((c) => c.text || "").join("\n\n---\n\n");
 
     // 2. Build prompt with context
-    const prompt = context
-      ? `You are a ServiceNow expert. Use the following documentation to answer the question. If the answer isn't in the docs, say so and answer from your general knowledge.
+    const userMessage = context
+      ? `DOCUMENTATION CONTEXT:\n${context}\n\n---\n\nUSER QUESTION: ${question}`
+      : `USER QUESTION: ${question}\n\n(No documentation context was found for this query. Answer from your general ServiceNow expertise and note that this is not sourced from the indexed docs.)`;
 
-DOCUMENTATION CONTEXT:
-${context}
-
-QUESTION: ${question}`
-      : `You are a ServiceNow expert. Answer this question: ${question}`;
-
-    // 3. Call Claude
+    // 3. Call Claude with system prompt
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
     });
 
     res.status(200).json({ answer: message.content[0].text });
