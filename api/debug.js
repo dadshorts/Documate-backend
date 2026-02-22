@@ -12,7 +12,17 @@ async function embedQuestion(question) {
       input: question,
     }),
   });
+
   const data = await response.json();
+
+  // NEW: Catch the error if OpenAI fails so it doesn't crash reading '0'
+  if (!response.ok || !data.data || !data.data[0]) {
+    // This will throw the exact error message from OpenAI back to your screen
+    throw new Error(
+      `OpenAI API Error: ${data.error?.message || "Missing or invalid OPENAI_API_KEY"}`,
+    );
+  }
+
   return data.data[0].embedding;
 }
 
@@ -25,6 +35,7 @@ export default async function handler(req, res) {
 
     const question = req.query.q || "bulk update transfer order lines";
     const vector = await embedQuestion(question);
+
     const results = await index.query({
       vector,
       topK: 10,
@@ -41,6 +52,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(simplified);
   } catch (error) {
+    // This will now output the specific OpenAI error we threw above
     res.status(500).json({ error: error.message });
   }
 }
