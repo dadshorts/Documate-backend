@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       includeMetadata: true,
     });
     console.log(
-      "Raw Metadata Sample:",
+      "RAW METADATA:",
       JSON.stringify(results.matches[0].metadata, null, 2),
     );
     const simplified = results.matches.map((m) => ({
