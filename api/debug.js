@@ -41,7 +41,10 @@ export default async function handler(req, res) {
       topK: 10,
       includeMetadata: true,
     });
-
+    console.log(
+      "Raw Metadata Sample:",
+      JSON.stringify(results.matches[0].metadata, null, 2),
+    );
     const simplified = results.matches.map((m) => ({
       score: m.score.toFixed(4),
       source: m.metadata.source || "?",
